@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS custom properties — espelha o tailwind.config.js */
+:root {
+  --c-primary:       #003F8A;
+  --c-primary-light: #1E5CB8;
+  --c-primary-dark:  #002B6E;
+  --c-accent:        #FF6600;
+  --c-accent-dark:   #E55A00;
+  --c-panel-base:    #EEF2F7;
+  --c-panel-surface: #FFFFFF;
+  --c-panel-raised:  #F8FAFC;
+  --c-panel-border:  #D1DCE8;
+  --c-ink-primary:   #0F172A;
+  --c-ink-secondary: #475569;
+  --c-ink-muted:     #94A3B8;
+  --c-positive:      #059669;
+  --c-caution:       #D97706;
+  --c-negative:      #DC2626;
+}
+
+/* ── Base ── */
+@layer base {
+  body {
+    background-color: var(--c-panel-base);
+    color: var(--c-ink-primary);
+    -webkit-font-smoothing: antialiased;
+    font-family: Inter, system-ui, sans-serif;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background-color: var(--c-panel-base); }
+  ::-webkit-scrollbar-thumb { background-color: var(--c-panel-border); border-radius: 9999px; }
+}
+
+/* ── Components ── */
+@layer components {
+  .glass-card {
+    @apply rounded-xl;
+    border: 1px solid var(--c-panel-border);
+    background-color: var(--c-panel-surface);
+    box-shadow: 0 1px 3px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.06);
+  }
+  .glass-card-raised {
+    @apply rounded-xl;
+    border: 1px solid var(--c-panel-border);
+    background-color: var(--c-panel-raised);
+    box-shadow: 0 1px 3px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.06);
+  }
+
+  .btn-primary {
+    @apply rounded-lg px-4 py-2 text-sm font-semibold text-white transition-all
+           disabled:cursor-not-allowed disabled:opacity-40;
+    background-color: var(--c-accent);
+  }
+  .btn-primary:hover:not(:disabled) { background-color: var(--c-accent-dark); }
+  .btn-primary:active:not(:disabled) { background-color: #CC5200; }
+
+  .btn-ghost {
+    @apply rounded-lg px-3 py-1.5 text-xs font-medium transition-all;
+    border: 1px solid var(--c-panel-border);
+    color: var(--c-ink-secondary);
+    background-color: var(--c-panel-surface);
+  }
+  .btn-ghost:hover { border-color: var(--c-accent); color: var(--c-accent); }
+  .btn-ghost:active { background-color: var(--c-panel-raised); }
+
+  .input-base {
+    @apply w-full rounded-lg px-3 py-2 text-sm focus:outline-none;
+    border: 1px solid var(--c-panel-border);
+    background-color: var(--c-panel-surface);
+    color: var(--c-ink-primary);
+  }
+  .input-base::placeholder { color: var(--c-ink-muted); }
+  .input-base:focus {
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(255,102,0,.14);
+  }
+}
