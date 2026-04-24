@@ -1,6 +1,6 @@
-import { Users, TrendingUp, UserPlus, Activity, UserMinus } from 'lucide-react';
+import { Users, TrendingUp, UserPlus, Activity, UserMinus, Calendar, CalendarCheck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { fetchSheetTotal, fetchPagarmeSummary } from '../../api/subscriptionsApi';
+import { fetchSheetTotal, fetchPagarmeSummary, fetchPlanSplit } from '../../api/subscriptionsApi';
 import SourceBadge from './SourceBadge';
 import type { SubscriptionPeriod } from '../../types/subscriptions';
 
@@ -68,8 +68,16 @@ export default function MetricCards({ period }: Props) {
     retry: 2,
   });
 
-  const sheet   = sheetQ.data;
-  const pagarme = pagarmeQ.data;
+  const planSplitQ = useQuery({
+    queryKey: ['subscriptions', 'plan-split'],
+    queryFn:  fetchPlanSplit,
+    staleTime: 5 * 60 * 1000,
+    retry: 2,
+  });
+
+  const sheet     = sheetQ.data;
+  const pagarme   = pagarmeQ.data;
+  const planSplit = planSplitQ.data;
 
   const growthStr = sheet?.growth == null
     ? '—'
@@ -134,6 +142,28 @@ export default function MetricCards({ period }: Props) {
         note={pagarme
           ? `${pagarme.canceledInPeriod} cancelamentos · % da base ativa`
           : undefined}
+      />
+
+      <Card
+        label="Assinantes Mensais"
+        value={(planSplit?.monthly ?? 0).toLocaleString('pt-BR')}
+        icon={<Calendar size={16} />}
+        iconBg="bg-sky-50 text-sky-600"
+        source="pagarme"
+        loading={planSplitQ.isPending}
+        error={planSplitQ.isError}
+        note="plano mensal · ativos"
+      />
+
+      <Card
+        label="Assinantes Anuais"
+        value={(planSplit?.annual ?? 0).toLocaleString('pt-BR')}
+        icon={<CalendarCheck size={16} />}
+        iconBg="bg-amber-50 text-amber-600"
+        source="pagarme"
+        loading={planSplitQ.isPending}
+        error={planSplitQ.isError}
+        note="plano anual · ativos"
       />
     </>
   );

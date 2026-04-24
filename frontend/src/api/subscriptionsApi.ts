@@ -28,6 +28,11 @@ export interface PagarmeSummary {
   churnRate:        number;  // canceledInPeriod / activeCount × 100 (%)
 }
 
+export interface PlanSplit {
+  monthly: number;
+  annual:  number;
+}
+
 export interface ChargesSummary {
   createdCount:    number; // total de cobranças no período
   createdTPV:      number; // soma de amount (R$)
@@ -69,6 +74,12 @@ export async function fetchChargesSummary(from: Date, to: Date): Promise<Charges
   const { data } = await api.get<ChargesSummary>('/charges-summary', {
     params: { from: from.toISOString(), to: to.toISOString() },
   });
+  return data;
+}
+
+/** Contagem de assinaturas ativas por tipo de plano (mensal/anual) — Fonte: API Pagar.me */
+export async function fetchPlanSplit(): Promise<PlanSplit> {
+  const { data } = await api.get<PlanSplit>('/plan-split');
   return data;
 }
 

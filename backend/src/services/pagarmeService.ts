@@ -341,6 +341,59 @@ export async function getChargesSummary(
   };
 }
 
+export interface PlanSplit {
+  monthly: number;
+  annual: number;
+}
+
+export async function getActiveSubscriptionsByInterval(
+  secretKey: string,
+): Promise<PlanSplit> {
+  const client = makeClient(secretKey);
+
+  // Página 1 — descobre total real e tamanho efetivo retornado pela API.
+  // A Pagar.me pode retornar menos itens que o 'size' solicitado (~30 interno).
+  const firstResp = await client.get<PagarmeResponse>('/subscriptions', {
+    params: { status: 'active', page: 1, size: PAGE_SIZE },
+  });
+  const { data: firstPage, paging } = firstResp.data;
+  const totalCount = paging?.total ?? 0;
+  if (totalCount === 0) return { monthly: 0, annual: 0 };
+
+  const all: PagarmeSubscription[] = [...firstPage];
+  const effectiveSize = firstPage.length;
+
+  if (totalCount > all.length && effectiveSize > 0) {
+    const totalPages = Math.ceil(totalCount / effectiveSize);
+    const BATCH = 5;
+    for (let batchStart = 2; batchStart <= totalPages; batchStart += BATCH) {
+      const batchEnd = Math.min(batchStart + BATCH - 1, totalPages);
+      const pageNums = Array.from({ length: batchEnd - batchStart + 1 }, (_, i) => batchStart + i);
+      const results = await Promise.all(
+        pageNums.map((p) =>
+          client.get<PagarmeResponse>('/subscriptions', {
+            params: { status: 'active', page: p, size: PAGE_SIZE },
+          }),
+        ),
+      );
+      results.forEach((r) => all.push(...r.data.data));
+    }
+  }
+
+  let monthly = 0;
+  let annual = 0;
+
+  for (const sub of all) {
+    if (sub.plan?.interval === 'year') {
+      annual++;
+    } else {
+      monthly++;
+    }
+  }
+
+  return { monthly, annual };
+}
+
 export async function getActiveSubscriptionStats(
   secretKey: string,
 ): Promise<SubscriptionStats> {

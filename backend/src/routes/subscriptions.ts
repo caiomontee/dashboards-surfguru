@@ -5,6 +5,7 @@ import {
   countNewSubscriptions,
   listSubscriptions,
   getChargesSummary,
+  getActiveSubscriptionsByInterval,
 } from '../services/pagarmeService';
 
 const router = Router();
@@ -125,6 +126,22 @@ router.get('/charges-summary', async (req: Request, res: Response) => {
     res.json({ ...data, fonte: 'API Pagar.me' });
   } catch (err) {
     console.error('[subscriptions/charges-summary]', err);
+    res.status(503).json({
+      error: err instanceof Error ? err.message : 'Erro na API Pagar.me',
+      fonte: 'API Pagar.me',
+    });
+  }
+});
+
+// ── GET /api/subscriptions/plan-split ────────────────────────────────────────
+// Fonte: API Pagar.me — contagem de assinaturas ativas por tipo de plano (mensal/anual)
+router.get('/plan-split', async (_req: Request, res: Response) => {
+  try {
+    const key  = getPagarmeKey();
+    const data = await getActiveSubscriptionsByInterval(key);
+    res.json({ ...data, fonte: 'API Pagar.me' });
+  } catch (err) {
+    console.error('[subscriptions/plan-split]', err);
     res.status(503).json({
       error: err instanceof Error ? err.message : 'Erro na API Pagar.me',
       fonte: 'API Pagar.me',
