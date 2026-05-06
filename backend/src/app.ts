@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import metricsRouter from './routes/metrics';
 import subscriptionsRouter from './routes/subscriptions';
+import cronRouter from './routes/cron';
 
 // Fábrica do app Express compartilhada entre:
 //  - servidor local (backend/src/index.ts → app.listen)
@@ -17,6 +18,7 @@ export function createApp() {
 
   app.use('/api/metrics', metricsRouter);
   app.use('/api/subscriptions', subscriptionsRouter);
+  app.use('/api/cron', cronRouter);
 
   return app;
 }

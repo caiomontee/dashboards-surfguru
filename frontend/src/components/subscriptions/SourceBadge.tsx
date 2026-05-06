@@ -3,7 +3,7 @@ interface Props {
 }
 
 const CONFIG = {
-  sheet:   { label: 'Planilha Geral',  cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  sheet:   { label: 'Supabase',        cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   pagarme: { label: 'API Pagar.me',    cls: 'bg-blue-50   text-blue-700   border-blue-200' },
 } as const;
 

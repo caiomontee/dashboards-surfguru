@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getLatestTotal, getHistoricalChart, clearCache } from '../services/sheetsService';
+import { getLatestTotal, getHistoricalChart, clearCache } from '../services/historyService';
 import {
   getActiveSubscriptionStats,
   countNewSubscriptions,
