@@ -4,9 +4,11 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "sync-subscriptions": "npm run build && node dist/workers/syncSubscriptions.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.3",
     "axios": "^1.7.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

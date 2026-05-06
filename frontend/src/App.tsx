@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import type { DateRange, FinancialData } from './types';
 import { subDays } from './utils/dateUtils';
 
+import { supabase } from './lib/supabase';
+import LoginPage from './pages/LoginPage';
 import DateRangePicker from './components/DateRangePicker';
 import OverloadImport from './components/OverloadImport';
 import FinancialKPIs from './components/FinancialKPIs';
@@ -15,13 +18,30 @@ const TABS: { id: Tab; label: string }[] = [
 ];
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('assinaturas');
-  const [dateRange, setDateRange]   = useState<DateRange>({
+  const [session, setSession]            = useState<Session | null | undefined>(undefined);
+  const [tab, setTab]                    = useState<Tab>('assinaturas');
+  const [dateRange, setDateRange]        = useState<DateRange>({
     from: subDays(new Date(), 30),
     to: new Date(),
   });
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
   const [calculating, setCalculating]     = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (session === undefined) {
+    return (
+      <div className="min-h-screen bg-panel-base flex items-center justify-center">
+        <span className="text-ink-muted text-sm">Carregando…</span>
+      </div>
+    );
+  }
+
+  if (!session) return <LoginPage />;
 
   return (
     <div className="min-h-screen bg-panel-base">
@@ -36,11 +56,19 @@ export default function App() {
               Dashboard Pro
             </span>
           </div>
-          <span className="hidden text-xs text-white/80 sm:block">
-            {new Date().toLocaleDateString('pt-BR', {
-              weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
-            })}
-          </span>
+          <div className="flex items-center gap-4">
+            <span className="hidden text-xs text-white/80 sm:block">
+              {new Date().toLocaleDateString('pt-BR', {
+                weekday: 'long', day: '2-digit', month: 'long', year: 'numeric',
+              })}
+            </span>
+            <button
+              onClick={() => supabase.auth.signOut()}
+              className="rounded-md border border-white/30 px-3 py-1 text-xs text-white/80 hover:bg-white/10 transition-colors"
+            >
+              Sair
+            </button>
+          </div>
         </div>
         {/* barra azul navy */}
         <div className="h-1.5 bg-primary" />
