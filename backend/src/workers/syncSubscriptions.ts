@@ -1,9 +1,12 @@
 import 'dotenv/config';
 import axios, { AxiosInstance } from 'axios';
 import { supabase } from '../lib/supabase';
-import { SUBSCRIPTIONS_HISTORY_TABLE, type SubscriptionsHistoryInsert } from '../types/subscriptions';
+import { SUBSCRIPTIONS_HISTORY_TABLE, type SubscriptionsHistoryInsert, type SubscriptionsHistoryRow } from '../types/subscriptions';
 
 const PAGARME_BASE_URL = 'https://api.pagar.me/core/v5';
+
+// PayPal é atualizado manualmente — valor fixo até ser automatizado
+const PAYPAL_FIXO = 11;
 
 interface PagarmeListResponse {
   paging: { total: number; previous?: string | null; next?: string | null };
@@ -43,58 +46,64 @@ export async function syncSubscriptions(): Promise<void> {
 
   try {
     console.log('[syncSubscriptions] Início do job');
-    if (dryRun) {
-      console.log('[syncSubscriptions] DRY_RUN=true — INSERT no Supabase será omitido.');
-    }
+    if (dryRun) console.log('[syncSubscriptions] DRY_RUN=true — INSERT omitido.');
 
     const client = makePagarmeClient(getPagarmeSecretKey());
 
     console.log('[syncSubscriptions] Etapa 1/4 — Buscando totais no Pagar.me…');
-
     const [pagarmeActive, pagarmeTrial] = await Promise.all([
       fetchSubscriptionStatusTotal(client, 'active'),
       fetchSubscriptionStatusTotal(client, 'future'),
     ]);
+    console.log(`  • status=active → ${pagarmeActive}`);
+    console.log(`  • status=future → ${pagarmeTrial}`);
 
-    console.log(`  • status=active  → ${pagarmeActive}  (→ "Total Pago Pagar.me")`);
-    console.log(`  • status=future  → ${pagarmeTrial}   (→ "Pagar.me (Trial)")`);
-
-    const total = pagarmeActive + pagarmeTrial;
-    console.log(`[syncSubscriptions] Etapa 2/4 — Total calculado: ${pagarmeActive} + ${pagarmeTrial} = ${total}`);
-
-    console.log('[syncSubscriptions] Etapa 3/4 — Buscando último snapshot para calcular Crescimento…');
-
+    console.log('[syncSubscriptions] Etapa 2/4 — Buscando último snapshot (carry-forward)…');
     const { data: lastRow, error: historyError } = await supabase
       .from(SUBSCRIPTIONS_HISTORY_TABLE)
-      .select('"Total", "Data"')
+      .select('"Data", "Total", "PIX", "Boleto", "Assinantes Via ADS"')
       .order('Data', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (historyError) throw historyError;
 
-    const previousTotal = lastRow?.Total ?? null;
-    const crescimento = previousTotal === null ? 0 : total - previousTotal;
+    const prev = lastRow as Pick<SubscriptionsHistoryRow,
+      'Data' | 'Total' | 'PIX' | 'Boleto' | 'Assinantes Via ADS'> | null;
 
+    // Carry-forward: reutiliza valores manuais da linha anterior
+    const pix    = prev?.PIX                    ?? 0;
+    const boleto = prev?.Boleto                 ?? 0;
+    const ads    = prev?.['Assinantes Via ADS'] ?? 0;
+
+    console.log(`  • Carry-forward — PIX: ${pix}, Boleto: ${boleto}, ADS: ${ads}, Paypal fixo: ${PAYPAL_FIXO}`);
+
+    // Total correto = soma de todas as plataformas
+    const total = pagarmeActive + pagarmeTrial + PAYPAL_FIXO + pix + boleto + ads;
+
+    const previousTotal = prev?.Total ?? null;
+    const crescimento   = previousTotal === null ? 0 : total - previousTotal;
+
+    console.log('[syncSubscriptions] Etapa 3/4 — Crescimento:');
     if (previousTotal === null) {
-      console.log('  • Sem snapshot anterior — Crescimento definido como 0 (baseline).');
+      console.log('  • Sem snapshot anterior — Crescimento = 0.');
     } else {
-      console.log(`  • Total anterior (${lastRow?.Data}): ${previousTotal}`);
-      console.log(`  • Crescimento: ${total} - ${previousTotal} = ${crescimento}`);
+      console.log(`  • Total anterior (${prev?.Data}): ${previousTotal}`);
+      console.log(`  • Total atual: ${total} → Crescimento: ${crescimento}`);
     }
 
-    const today = new Date().toISOString().split('T')[0]; // 'YYYY-MM-DD'
+    const today = new Date().toISOString().split('T')[0];
 
     const insertRow: SubscriptionsHistoryInsert = {
-      Data: today,
+      Data:                  today,
       'Total Pago Pagar.me': pagarmeActive,
-      'Pagar.me (Trial)': pagarmeTrial,
-      Paypal: 0,
-      PIX: 0,
-      Boleto: 0,
-      'Assinantes Via ADS': 0,
-      Total: total,
-      Crescimento: crescimento,
+      'Pagar.me (Trial)':    pagarmeTrial,
+      Paypal:                PAYPAL_FIXO,
+      PIX:                   pix,
+      Boleto:                boleto,
+      'Assinantes Via ADS':  ads,
+      Total:                 total,
+      Crescimento:           crescimento,
     };
 
     console.log('[syncSubscriptions] Etapa 4/4 — Payload:', JSON.stringify(insertRow));
@@ -107,7 +116,6 @@ export async function syncSubscriptions(): Promise<void> {
         .insert(insertRow);
 
       if (insertError) throw insertError;
-
       console.log('[syncSubscriptions] Sucesso — linha inserida em acompanhamento_assinantes.');
     }
   } catch (err) {
