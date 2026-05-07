@@ -1,35 +1,18 @@
 import { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { RefreshCw } from 'lucide-react';
 import PeriodSelector, { buildPeriod } from '../components/subscriptions/PeriodSelector';
 import MetricCards from '../components/subscriptions/MetricCards';
 import ChargesCards from '../components/subscriptions/ChargesCards';
 import SubscriptionsChart from '../components/subscriptions/SubscriptionsChart';
 import SubscriptionsTable from '../components/subscriptions/SubscriptionsTable';
-import { refreshSheetCache } from '../api/subscriptionsApi';
 import type { SubscriptionPeriod } from '../types/subscriptions';
 
 export default function SubscriptionsDashboard() {
-  const [period, setPeriod]       = useState<SubscriptionPeriod>(() => buildPeriod('30d'));
-  const [refreshing, setRefreshing] = useState(false);
-  const queryClient = useQueryClient();
-
-  async function handleRefresh() {
-    setRefreshing(true);
-    try {
-      // Invalida cache no backend e depois invalida queries no frontend
-      await refreshSheetCache();
-      await queryClient.invalidateQueries({ queryKey: ['subscriptions', 'total'] });
-      await queryClient.invalidateQueries({ queryKey: ['subscriptions', 'historical'] });
-    } finally {
-      setRefreshing(false);
-    }
-  }
+  const [period, setPeriod] = useState<SubscriptionPeriod>(() => buildPeriod('30d'));
 
   return (
     <div className="space-y-6">
 
-      {/* ── Filtros + Atualizar ───────────────────────────────────── */}
+      {/* ── Filtros ───────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap">
           <PeriodSelector
@@ -37,24 +20,13 @@ export default function SubscriptionsDashboard() {
             onPeriodChange={setPeriod}
             onDownload={() => {}}
           />
-
-          {/* Botão de refresh da planilha */}
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            title="Busca os dados mais recentes da planilha agora (ignora o cache)"
-            className="flex items-center gap-2 rounded-lg border border-panel-border bg-panel-surface px-4 py-2 text-sm font-medium text-ink-secondary shadow-sm transition hover:border-emerald-500 hover:text-emerald-600 disabled:opacity-50"
-          >
-            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-            {refreshing ? 'Atualizando...' : 'Atualizar planilha'}
-          </button>
         </div>
 
         {/* Legenda das fontes */}
         <div className="hidden sm:flex items-center gap-3 text-xs text-ink-muted">
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Planilha Geral
+            Supabase
           </span>
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-blue-500" />
