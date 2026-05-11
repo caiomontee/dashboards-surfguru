@@ -1,6 +1,26 @@
 import type { EvolutionPoint, ComparisonPoint, LTVCACPoint } from '../types';
 import { subDays } from './dateUtils';
 
+export interface EntradaChurnPoint {
+  month: string;
+  entradas: number;
+  churn: number;
+  liquido: number;
+}
+
+export interface TrialPoint {
+  month: string;
+  iniciados: number;
+  convertidos: number;
+  taxa: number;
+}
+
+export interface MRRPoint {
+  month: string;
+  mrr: number;
+  ativos: number;
+}
+
 // Gerador determinístico baseado em seed para evitar flickering entre renders
 function seededValue(seed: string, min: number, max: number): number {
   let h = 2166136261;
@@ -67,6 +87,42 @@ export function generateLTVCACData(): LTVCACPoint[] {
       ratio: parseFloat((ltv / cac).toFixed(1)),
     };
   });
+}
+
+function getLastNMonths(n: number): string[] {
+  const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const now = new Date();
+  const result: string[] = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    result.push(`${meses[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`);
+  }
+  return result;
+}
+
+export function generateEntradaChurnData(): EntradaChurnPoint[] {
+  return getLastNMonths(12).map((month, i) => {
+    const entradas = seededValue(`ent_${month}`, 80, 155) + i * 3;
+    const churn    = seededValue(`chu_${month}`, 25, 65);
+    return { month, entradas, churn, liquido: entradas - churn };
+  });
+}
+
+export function generateTrialData(): TrialPoint[] {
+  return getLastNMonths(6).map((month) => {
+    const iniciados   = seededValue(`tri_${month}`, 150, 350);
+    const taxa        = seededValue(`txa_${month}`, 50, 74);
+    const convertidos = Math.round(iniciados * taxa / 100);
+    return { month, iniciados, convertidos, taxa };
+  });
+}
+
+export function generateMRRData(): MRRPoint[] {
+  return getLastNMonths(12).map((month, i) => ({
+    month,
+    mrr:    seededValue(`mrr_${month}`, 80000, 95000) + i * 6000,
+    ativos: seededValue(`atv_${month}`, 1180, 1250) + i * 30,
+  }));
 }
 
 // Dados de aquisição mockados para quando o backend não está disponível

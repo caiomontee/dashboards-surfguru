@@ -68,6 +68,17 @@ export async function fetchComparison(
   return data;
 }
 
+export interface ConversionData {
+  acessos: number;
+  assinaturas: number;
+  taxaConversao: number;
+}
+
+export async function fetchConversion(): Promise<ConversionData> {
+  const { data } = await api.get<ConversionData>('/conversion');
+  return data;
+}
+
 export async function calculateMetrics(
   overloadReport: string,
   lifetimeMonths: number,

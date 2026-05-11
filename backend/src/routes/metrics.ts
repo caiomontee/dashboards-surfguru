@@ -1,6 +1,18 @@
 import { Router, Request, Response } from 'express';
+import axios from 'axios';
 import { countNewSubscriptions, getActiveSubscriptionStats } from '../services/pagarmeService';
 import { parseOverloadReport } from '../parsers/overloadParser';
+
+const GA4_PLANOS_URL =
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vRybFeq68X_urvCH2uQ-1maXQT_6GFRuXCKbctn9H1i2kZEpbOEVCYfB2LklnKpAFCF7QiJyUDyZyjz/pub?gid=0&single=true&output=csv';
+
+async function fetchPlansAccess(): Promise<number> {
+  const { data } = await axios.get<string>(GA4_PLANOS_URL, { responseType: 'text', timeout: 15_000 });
+  const num = Number(data.trim());
+  if (isNaN(num)) throw new Error(`Resposta inesperada do GA4: "${data.trim()}"`);
+  return num;
+}
+
 
 const router = Router();
 
@@ -194,6 +206,24 @@ router.post('/calculate', async (req: Request, res: Response) => {
         retentionMonths:    lifetimeMonths,
       },
     });
+  } catch (err: unknown) {
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Erro desconhecido' });
+  }
+});
+
+// GET /api/metrics/conversion
+router.get('/conversion', async (_req: Request, res: Response) => {
+  try {
+    const secretKey = getSecretKey();
+    const now = new Date();
+    const [acessos, assinaturas] = await Promise.all([
+      fetchPlansAccess(),
+      countConverted(secretKey, daysAgo(30), now),
+    ]);
+    const taxaConversao = acessos > 0
+      ? parseFloat(((assinaturas / acessos) * 100).toFixed(2))
+      : 0;
+    res.json({ acessos, assinaturas, taxaConversao });
   } catch (err: unknown) {
     res.status(500).json({ error: err instanceof Error ? err.message : 'Erro desconhecido' });
   }

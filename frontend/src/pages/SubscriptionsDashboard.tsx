@@ -4,6 +4,9 @@ import MetricCards from '../components/subscriptions/MetricCards';
 import ChargesCards from '../components/subscriptions/ChargesCards';
 import SubscriptionsChart from '../components/subscriptions/SubscriptionsChart';
 import SubscriptionsTable from '../components/subscriptions/SubscriptionsTable';
+import ConversionCard from '../components/ConversionCard';
+import ConversionFunnelChart from '../components/ConversionFunnelChart';
+import PlanDonutChart from '../components/charts/executive/PlanDonutChart';
 import type { SubscriptionPeriod } from '../types/subscriptions';
 
 export default function SubscriptionsDashboard() {
@@ -40,6 +43,19 @@ export default function SubscriptionsDashboard() {
         <MetricCards period={period} />
       </div>
 
+      {/* ── Taxa de Conversão /planos ─────────────────────────────── */}
+      <div>
+        <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">
+          Taxa de Conversão · /planos
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <ConversionCard />
+        </div>
+        <div className="mt-4">
+          <ConversionFunnelChart />
+        </div>
+      </div>
+
       {/* ── Cards de Cobranças (TPV) ──────────────────────────────── */}
       <div>
         <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-ink-muted">
@@ -50,8 +66,11 @@ export default function SubscriptionsDashboard() {
         </div>
       </div>
 
-      {/* ── Gráfico histórico anual ───────────────────────────────── */}
-      <SubscriptionsChart />
+      {/* ── Gráfico histórico + Distribuição de Planos ───────────── */}
+      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+        <SubscriptionsChart />
+        <PlanDonutChart />
+      </div>
 
       {/* ── Tabela detalhada ─────────────────────────────────────── */}
       <div>
