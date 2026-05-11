@@ -9,12 +9,14 @@ import DateRangePicker from './components/DateRangePicker';
 import OverloadImport from './components/OverloadImport';
 import FinancialKPIs from './components/FinancialKPIs';
 import SubscriptionsDashboard from './pages/SubscriptionsDashboard';
+import ExecutiveDashboard from './pages/ExecutiveDashboard';
 
-type Tab = 'ltvcac' | 'assinaturas';
+type Tab = 'ltvcac' | 'assinaturas' | 'executivo';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'assinaturas', label: 'Assinaturas' },
   { id: 'ltvcac',      label: 'LTV e CAC' },
+  { id: 'executivo',   label: 'Dashboard Executivo' },
 ];
 
 export default function App() {
@@ -102,6 +104,8 @@ export default function App() {
       <main className="mx-auto max-w-7xl px-6 py-8">
         {tab === 'assinaturas' ? (
           <SubscriptionsDashboard />
+        ) : tab === 'executivo' ? (
+          <ExecutiveDashboard />
         ) : (
           <div className="space-y-6">
             <DateRangePicker value={dateRange} onChange={setDateRange} />

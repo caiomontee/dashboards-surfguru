@@ -346,52 +346,79 @@ export interface PlanSplit {
   annual: number;
 }
 
+// Cache em memória para plan-split — evita paginar todas as assinaturas a cada request
+let planSplitCache: { value: PlanSplit; expiresAt: number } | null = null;
+const PLAN_SPLIT_TTL_MS = 60 * 60 * 1000; // 1 hora
+
 export async function getActiveSubscriptionsByInterval(
   secretKey: string,
 ): Promise<PlanSplit> {
+  if (planSplitCache && Date.now() < planSplitCache.expiresAt) {
+    return planSplitCache.value;
+  }
+
   const client = makeClient(secretKey);
 
-  // Página 1 — descobre total real e tamanho efetivo retornado pela API.
-  // A Pagar.me pode retornar menos itens que o 'size' solicitado (~30 interno).
-  const firstResp = await client.get<PagarmeResponse>('/subscriptions', {
-    params: { status: 'active', page: 1, size: PAGE_SIZE },
-  });
-  const { data: firstPage, paging } = firstResp.data;
-  const totalCount = paging?.total ?? 0;
-  if (totalCount === 0) return { monthly: 0, annual: 0 };
+  // Tenta filtro por interval — busca também total sem filtro para detectar se a Pagar.me ignora o param.
+  const [monthlyResp, annualResp, totalResp] = await Promise.all([
+    client.get<PagarmeResponse>('/subscriptions', {
+      params: { status: 'active', interval: 'month', page: 1, size: 1 },
+    }),
+    client.get<PagarmeResponse>('/subscriptions', {
+      params: { status: 'active', interval: 'year', page: 1, size: 1 },
+    }),
+    client.get<PagarmeResponse>('/subscriptions', {
+      params: { status: 'active', page: 1, size: 1 },
+    }),
+  ]);
 
-  const all: PagarmeSubscription[] = [...firstPage];
-  const effectiveSize = firstPage.length;
+  const monthly    = monthlyResp.data.paging?.total ?? 0;
+  const annual     = annualResp.data.paging?.total  ?? 0;
+  const totalActive = totalResp.data.paging?.total  ?? 0;
 
-  if (totalCount > all.length && effectiveSize > 0) {
-    const totalPages = Math.ceil(totalCount / effectiveSize);
-    const BATCH = 5;
-    for (let batchStart = 2; batchStart <= totalPages; batchStart += BATCH) {
-      const batchEnd = Math.min(batchStart + BATCH - 1, totalPages);
-      const pageNums = Array.from({ length: batchEnd - batchStart + 1 }, (_, i) => batchStart + i);
-      const results = await Promise.all(
-        pageNums.map((p) =>
-          client.get<PagarmeResponse>('/subscriptions', {
-            params: { status: 'active', page: p, size: PAGE_SIZE },
-          }),
-        ),
-      );
-      results.forEach((r) => all.push(...r.data.data));
+  // Filtro funciona se month e year retornam valores diferentes do total geral
+  const filterWorks = totalActive > 0 && monthly !== totalActive && annual !== totalActive;
+
+  if (!filterWorks) {
+    const firstResp = await client.get<PagarmeResponse>('/subscriptions', {
+      params: { status: 'active', page: 1, size: PAGE_SIZE },
+    });
+    const { data: firstPage, paging } = firstResp.data;
+    const totalCount = paging?.total ?? 0;
+    if (totalCount === 0) return { monthly: 0, annual: 0 };
+
+    const all: PagarmeSubscription[] = [...firstPage];
+    const effectiveSize = firstPage.length;
+
+    if (totalCount > all.length && effectiveSize > 0) {
+      const totalPages = Math.ceil(totalCount / effectiveSize);
+      const BATCH = 5;
+      for (let batchStart = 2; batchStart <= totalPages; batchStart += BATCH) {
+        const batchEnd = Math.min(batchStart + BATCH - 1, totalPages);
+        const pageNums = Array.from({ length: batchEnd - batchStart + 1 }, (_, i) => batchStart + i);
+        const results = await Promise.all(
+          pageNums.map((p) =>
+            client.get<PagarmeResponse>('/subscriptions', {
+              params: { status: 'active', page: p, size: PAGE_SIZE },
+            }),
+          ),
+        );
+        results.forEach((r) => all.push(...r.data.data));
+      }
     }
+
+    let m = 0; let a = 0;
+    for (const sub of all) {
+      if (sub.plan?.interval === 'year') a++; else m++;
+    }
+    const result = { monthly: m, annual: a };
+    planSplitCache = { value: result, expiresAt: Date.now() + PLAN_SPLIT_TTL_MS };
+    return result;
   }
 
-  let monthly = 0;
-  let annual = 0;
-
-  for (const sub of all) {
-    if (sub.plan?.interval === 'year') {
-      annual++;
-    } else {
-      monthly++;
-    }
-  }
-
-  return { monthly, annual };
+  const result = { monthly, annual };
+  planSplitCache = { value: result, expiresAt: Date.now() + PLAN_SPLIT_TTL_MS };
+  return result;
 }
 
 export async function getActiveSubscriptionStats(
