@@ -73,7 +73,7 @@ export default function ConversionFunnelChart() {
               />
               <Tooltip
                 cursor={{ fill: 'transparent' }}
-                formatter={(v: number) => [v.toLocaleString('pt-BR'), 'total']}
+                formatter={(v) => [Number(v).toLocaleString('pt-BR'), 'total']}
                 contentStyle={{ fontSize: '11px', borderRadius: '8px' }}
               />
               <Bar dataKey="value" radius={4}>
@@ -84,7 +84,7 @@ export default function ConversionFunnelChart() {
                   dataKey="value"
                   position="right"
                   style={{ fontSize: 13, fontWeight: 700, fill: '#0f172a' }}
-                  formatter={(v: number) => v.toLocaleString('pt-BR')}
+                  formatter={(v) => Number(v).toLocaleString('pt-BR')}
                 />
               </Bar>
             </BarChart>

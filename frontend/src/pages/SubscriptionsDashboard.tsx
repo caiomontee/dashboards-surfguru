@@ -8,9 +8,45 @@ import ConversionCard from '../components/ConversionCard';
 import ConversionFunnelChart from '../components/ConversionFunnelChart';
 import PlanDonutChart from '../components/charts/executive/PlanDonutChart';
 import type { SubscriptionPeriod } from '../types/subscriptions';
+import { fetchSheetTotal, fetchPagarmeSummary, fetchChargesSummary, fetchPlanSplit } from '../api/subscriptionsApi';
+import { generateReport, buildWhatsAppText } from '../utils/generateReport';
 
 export default function SubscriptionsDashboard() {
-  const [period, setPeriod] = useState<SubscriptionPeriod>(() => buildPeriod('30d'));
+  const [period, setPeriod]           = useState<SubscriptionPeriod>(() => buildPeriod('30d'));
+  const [isDownloading, setDownloading] = useState(false);
+  const [isSharing, setSharing]         = useState(false);
+
+  async function fetchAllMetrics() {
+    const [sheet, pagarme, charges, plans] = await Promise.all([
+      fetchSheetTotal(),
+      fetchPagarmeSummary(period.from, period.to),
+      fetchChargesSummary(period.from, period.to),
+      fetchPlanSplit(),
+    ]);
+    return { sheet, pagarme, charges, plans, period };
+  }
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const data = await fetchAllMetrics();
+      await generateReport(data);
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  async function handleShare() {
+    setSharing(true);
+    try {
+      const data = await fetchAllMetrics();
+      const text  = buildWhatsAppText(data);
+      const url   = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } finally {
+      setSharing(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -21,7 +57,10 @@ export default function SubscriptionsDashboard() {
           <PeriodSelector
             period={period}
             onPeriodChange={setPeriod}
-            onDownload={() => {}}
+            onDownload={handleDownload}
+            onShare={handleShare}
+            isDownloading={isDownloading}
+            isSharing={isSharing}
           />
         </div>
 
