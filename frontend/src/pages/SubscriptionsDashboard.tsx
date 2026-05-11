@@ -39,9 +39,13 @@ export default function SubscriptionsDashboard() {
   async function handleShare() {
     setSharing(true);
     try {
-      const data = await fetchAllMetrics();
-      const text  = buildWhatsAppText(data);
-      const url   = `https://wa.me/?text=${encodeURIComponent(text)}`;
+      const data    = await fetchAllMetrics();
+      const text    = buildWhatsAppText(data);
+      const encoded = encodeURIComponent(text);
+      const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const url = isMobile
+        ? `whatsapp://send?text=${encoded}`
+        : `https://web.whatsapp.com/send?text=${encoded}`;
       window.open(url, '_blank', 'noopener,noreferrer');
     } finally {
       setSharing(false);
