@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import PeriodSelector, { buildPeriod } from '../components/subscriptions/PeriodSelector';
 import MetricCards from '../components/subscriptions/MetricCards';
 import ChargesCards from '../components/subscriptions/ChargesCards';
@@ -8,29 +9,40 @@ import ConversionCard from '../components/ConversionCard';
 import ConversionFunnelChart from '../components/ConversionFunnelChart';
 import PlanDonutChart from '../components/charts/executive/PlanDonutChart';
 import type { SubscriptionPeriod } from '../types/subscriptions';
+import type { SheetTotal, PagarmeSummary, ChargesSummary, PlanSplit } from '../api/subscriptionsApi';
 import { fetchSheetTotal, fetchPagarmeSummary, fetchChargesSummary, fetchPlanSplit } from '../api/subscriptionsApi';
-import { generateReport, buildWhatsAppText } from '../utils/generateReport';
+import { generateReport, buildWhatsAppText, type ReportData } from '../utils/generateReport';
 
 export default function SubscriptionsDashboard() {
-  const [period, setPeriod]           = useState<SubscriptionPeriod>(() => buildPeriod('30d'));
+  const [period, setPeriod]             = useState<SubscriptionPeriod>(() => buildPeriod('30d'));
   const [isDownloading, setDownloading] = useState(false);
   const [isSharing, setSharing]         = useState(false);
+  const qc = useQueryClient();
 
-  async function fetchAllMetrics() {
+  // Lê do cache do React Query (já carregado pelos componentes filhos),
+  // fazendo fetch apenas do que ainda não estiver disponível.
+  async function getMetrics(): Promise<ReportData> {
+    const fromISO = period.from.toISOString();
+    const toISO   = period.to.toISOString();
+
     const [sheet, pagarme, charges, plans] = await Promise.all([
-      fetchSheetTotal(),
-      fetchPagarmeSummary(period.from, period.to),
-      fetchChargesSummary(period.from, period.to),
-      fetchPlanSplit(),
+      qc.getQueryData<SheetTotal>(['subscriptions', 'total'])
+        ?? qc.fetchQuery({ queryKey: ['subscriptions', 'total'], queryFn: fetchSheetTotal }),
+      qc.getQueryData<PagarmeSummary>(['subscriptions', 'pagarme-summary', fromISO, toISO])
+        ?? qc.fetchQuery({ queryKey: ['subscriptions', 'pagarme-summary', fromISO, toISO], queryFn: () => fetchPagarmeSummary(period.from, period.to) }),
+      qc.getQueryData<ChargesSummary>(['subscriptions', 'charges-summary', fromISO, toISO])
+        ?? qc.fetchQuery({ queryKey: ['subscriptions', 'charges-summary', fromISO, toISO], queryFn: () => fetchChargesSummary(period.from, period.to) }),
+      qc.getQueryData<PlanSplit>(['subscriptions', 'plan-split'])
+        ?? qc.fetchQuery({ queryKey: ['subscriptions', 'plan-split'], queryFn: fetchPlanSplit }),
     ]);
-    return { sheet, pagarme, charges, plans, period };
+
+    return { sheet: sheet!, pagarme: pagarme!, charges: charges!, plans: plans!, period };
   }
 
   async function handleDownload() {
     setDownloading(true);
     try {
-      const data = await fetchAllMetrics();
-      await generateReport(data);
+      await generateReport(await getMetrics());
     } finally {
       setDownloading(false);
     }
@@ -38,15 +50,18 @@ export default function SubscriptionsDashboard() {
 
   async function handleShare() {
     setSharing(true);
+    // Abre janela imediatamente (gesto do usuário) para evitar bloqueio de popup
+    const win = window.open('', '_blank', 'noopener,noreferrer');
     try {
-      const data    = await fetchAllMetrics();
-      const text    = buildWhatsAppText(data);
+      const text    = buildWhatsAppText(await getMetrics());
       const encoded = encodeURIComponent(text);
       const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
       const url = isMobile
         ? `whatsapp://send?text=${encoded}`
         : `https://web.whatsapp.com/send?text=${encoded}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
+      if (win) win.location.href = url; else window.open(url, '_blank', 'noopener,noreferrer');
+    } catch {
+      win?.close();
     } finally {
       setSharing(false);
     }
