@@ -359,22 +359,27 @@ export async function getActiveSubscriptionsByInterval(
 
   const client = makeClient(secretKey);
 
-  // Tenta filtro por interval (2 requests em vez de paginar tudo).
-  // A Pagar.me v5 suporta ?interval= na listagem de assinaturas.
-  const [monthlyResp, annualResp] = await Promise.all([
+  // Tenta filtro por interval — busca também total sem filtro para detectar se a Pagar.me ignora o param.
+  const [monthlyResp, annualResp, totalResp] = await Promise.all([
     client.get<PagarmeResponse>('/subscriptions', {
       params: { status: 'active', interval: 'month', page: 1, size: 1 },
     }),
     client.get<PagarmeResponse>('/subscriptions', {
       params: { status: 'active', interval: 'year', page: 1, size: 1 },
     }),
+    client.get<PagarmeResponse>('/subscriptions', {
+      params: { status: 'active', page: 1, size: 1 },
+    }),
   ]);
 
-  const monthly = monthlyResp.data.paging?.total ?? 0;
-  const annual  = annualResp.data.paging?.total  ?? 0;
+  const monthly    = monthlyResp.data.paging?.total ?? 0;
+  const annual     = annualResp.data.paging?.total  ?? 0;
+  const totalActive = totalResp.data.paging?.total  ?? 0;
 
-  // Se o filtro não funcionar (ambos 0 mas há assinantes), cai na paginação completa
-  if (monthly === 0 && annual === 0) {
+  // Filtro funciona se month e year retornam valores diferentes do total geral
+  const filterWorks = totalActive > 0 && monthly !== totalActive && annual !== totalActive;
+
+  if (!filterWorks) {
     const firstResp = await client.get<PagarmeResponse>('/subscriptions', {
       params: { status: 'active', page: 1, size: PAGE_SIZE },
     });
